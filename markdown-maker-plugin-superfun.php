@@ -6,6 +6,8 @@
  * Version: 1.0.0
  * Author: Your Name
  * License: GPL v2 or later
+ * Text Domain: markdown-maker
+ * Domain Path: /languages
  * 
  * DOCUMENTATION & USAGE:
  * =====================
@@ -43,6 +45,11 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Convert HTML content to Markdown
  */
 function markdown_maker_html_to_markdown( $html ) {
+    // Validate input
+    if ( ! is_string( $html ) ) {
+        return '';
+    }
+    
     // Remove WordPress shortcodes
     $html = strip_shortcodes( $html );
     
@@ -145,6 +152,11 @@ function markdown_maker_get_post_markdown( $post_id = null ) {
         $post_id = get_the_ID();
     }
     
+    // Validate post ID
+    if ( ! $post_id || $post_id <= 0 ) {
+        return '';
+    }
+    
     $post = get_post( $post_id );
     
     if ( ! $post ) {
@@ -216,6 +228,11 @@ function markdown_maker_get_filename( $post_id = null ) {
         $post_id = get_the_ID();
     }
     
+    // Validate post ID
+    if ( ! $post_id || $post_id <= 0 ) {
+        return 'markdown-export.md';
+    }
+    
     $title = get_the_title( $post_id );
     
     // Convert to lowercase and replace spaces with hyphens
@@ -242,6 +259,16 @@ function markdown_maker_copy_link( $post_id = null, $text = 'Copy as Markdown', 
     if ( ! $post_id ) {
         $post_id = get_the_ID();
     }
+    
+    // Validate post ID
+    if ( ! $post_id || $post_id <= 0 ) {
+        return '';
+    }
+    
+    // Sanitize input parameters
+    $text = sanitize_text_field( $text );
+    $subtitle = sanitize_text_field( $subtitle );
+    $class = sanitize_html_class( $class );
     
     $markdown = markdown_maker_get_post_markdown( $post_id );
     $markdown_escaped = esc_attr( $markdown );
@@ -305,6 +332,16 @@ function markdown_maker_download_link( $post_id = null, $text = 'Download as Mar
         $post_id = get_the_ID();
     }
     
+    // Validate post ID
+    if ( ! $post_id || $post_id <= 0 ) {
+        return '';
+    }
+    
+    // Sanitize input parameters
+    $text = sanitize_text_field( $text );
+    $subtitle = sanitize_text_field( $subtitle );
+    $class = sanitize_html_class( $class );
+    
     $nonce = wp_create_nonce( 'markdown_maker_download_' . $post_id );
     $download_url = add_query_arg( array(
         'markdown_maker_download' => $post_id,
@@ -328,22 +365,27 @@ function markdown_maker_handle_download() {
     }
     
     $post_id = intval( $_GET['markdown_maker_download'] );
-    $nonce = isset( $_GET['nonce'] ) ? $_GET['nonce'] : '';
+    $nonce = isset( $_GET['nonce'] ) ? sanitize_text_field( $_GET['nonce'] ) : '';
     
     // Verify nonce
     if ( ! wp_verify_nonce( $nonce, 'markdown_maker_download_' . $post_id ) ) {
-        wp_die( 'Security check failed' );
+        wp_die( esc_html__( 'Security check failed. Please try again.', 'markdown-maker' ) );
+    }
+    
+    // Validate post ID
+    if ( $post_id <= 0 ) {
+        wp_die( esc_html__( 'Invalid post ID.', 'markdown-maker' ) );
     }
     
     // Get post
     $post = get_post( $post_id );
     if ( ! $post ) {
-        wp_die( 'Post not found' );
+        wp_die( esc_html__( 'Post not found.', 'markdown-maker' ) );
     }
     
     // Check if post is publicly viewable
     if ( ! is_post_publicly_viewable( $post ) && ! current_user_can( 'edit_post', $post_id ) ) {
-        wp_die( 'You do not have permission to download this content' );
+        wp_die( esc_html__( 'You do not have permission to download this content.', 'markdown-maker' ) );
     }
     
     // Get markdown content
@@ -352,11 +394,12 @@ function markdown_maker_handle_download() {
     
     // Send download headers
     header( 'Content-Type: text/markdown; charset=utf-8' );
-    header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+    header( 'Content-Disposition: attachment; filename="' . sanitize_file_name( $filename ) . '"' );
     header( 'Content-Length: ' . strlen( $markdown ) );
     header( 'Cache-Control: no-cache, must-revalidate' );
     header( 'Expires: Sat, 26 Jul 1997 05:00:00 GMT' );
     
+    // Output the markdown content - it's plain text so we can output directly
     echo $markdown;
     exit;
 }
